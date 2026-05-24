@@ -272,6 +272,8 @@ Resources:
       Description: DynDNS2-compatible Dynamic DNS update API
       EndpointConfiguration:
         Types: [REGIONAL]
+      SecurityPolicy: !Ref SecurityPolicy
+      EndpointAccessMode: !If [IsEnhancedPolicy, STRICT, !Ref 'AWS::NoValue']
 
   # /nic
   NicResource:
