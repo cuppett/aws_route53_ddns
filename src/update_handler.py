@@ -5,6 +5,7 @@ import os
 from src.dns_utils import get_current_record, upsert_record
 from src.validators import validate_fqdn, validate_ipv4
 
+logging.getLogger().setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
 
 RECORD_TTL = int(os.environ.get('RECORD_TTL', '60'))
@@ -51,6 +52,9 @@ def _handle(event):
     if not validate_ipv4(ip):
         return _plain('dnserr')
 
+    username = authorizer.get('username', 'unknown')
+    logger.info('Request: user=%s src_ip=%s ip=%s hostnames=%s', username, source_ip, ip, hostnames)
+
     # Build allowed hosts lookup from authorizer context
     try:
         allowed_hosts_raw = json.loads(authorizer.get('allowed_hosts', '[]'))
@@ -63,6 +67,7 @@ def _handle(event):
     results = []
     for hostname in hostnames:
         result = _process_hostname(hostname, ip, allowed_map)
+        logger.info('Result: user=%s hostname=%s ip=%s outcome=%s', username, hostname, ip, result)
         results.append(result)
 
     return _plain('\n'.join(results))

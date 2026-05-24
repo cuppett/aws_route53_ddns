@@ -39,6 +39,12 @@ Parameters:
     Default: 14
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653]
 
+  LogLevel:
+    Description: Python logging level for the Lambda functions
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+
   StageName:
     Description: API Gateway stage name
     Type: String
@@ -206,6 +212,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref TableName
+          LOG_LEVEL: !Ref LogLevel
 
   UpdateHandlerFunction:
     Type: AWS::Lambda::Function
@@ -225,6 +232,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref TableName
           RECORD_TTL: !Ref RecordTtl
+          LOG_LEVEL: !Ref LogLevel
 
   CheckipFunction:
     Type: AWS::Lambda::Function

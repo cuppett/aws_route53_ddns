@@ -6,6 +6,7 @@ import os
 import bcrypt
 import boto3
 
+logging.getLogger().setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger(__name__)
 
 TABLE_NAME = os.environ.get('TABLE_NAME', 'DDNSAuthorization')
@@ -93,4 +94,5 @@ def handler(event, context):
         return _deny(username)
 
     allowed_hosts = user.get('allowed_hosts', [])
+    logger.info('Authorized: user=%s hosts=%d', username, len(allowed_hosts))
     return _allow(username, method_arn, allowed_hosts)

@@ -19,7 +19,10 @@ def get_current_record(zone_id: str, hostname: str) -> str | None:
         if rrset['Name'].rstrip('.') == hostname.rstrip('.') and rrset['Type'] == 'A':
             records = rrset.get('ResourceRecords', [])
             if records:
-                return records[0]['Value']
+                current = records[0]['Value']
+                logger.info('Route53 lookup: hostname=%s zone=%s current=%s', hostname, zone_id, current)
+                return current
+    logger.info('Route53 lookup: hostname=%s zone=%s current=None', hostname, zone_id)
     return None
 
 
@@ -41,6 +44,7 @@ def upsert_record(zone_id: str, hostname: str, ip: str, ttl: int = 60) -> bool:
                 }],
             },
         )
+        logger.info('Route53 UPSERT: hostname=%s ip=%s zone=%s ttl=%d', hostname, ip, zone_id, ttl)
         return True
     except Exception:
         logger.exception('Route53 UPSERT failed for %s in zone %s', hostname, zone_id)
