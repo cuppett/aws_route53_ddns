@@ -3,11 +3,12 @@
 
 import argparse
 import datetime
+import getpass
 import sys
 
 import bcrypt
 import boto3
-from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 
 DEFAULT_TABLE = 'DDNSAuthorization'
@@ -24,7 +25,20 @@ def _now():
 
 
 def _hash_password(password: str) -> str:
+    if not password:
+        print('ERROR: Password must not be empty.', file=sys.stderr)
+        sys.exit(1)
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def _read_password(provided: str | None) -> str:
+    if provided is not None:
+        return provided
+    pw = getpass.getpass('Password: ')
+    if getpass.getpass('Confirm: ') != pw:
+        print('ERROR: Passwords do not match.', file=sys.stderr)
+        sys.exit(1)
+    return pw
 
 
 def _parse_hosts(hosts_str: str) -> list[dict]:
@@ -50,10 +64,11 @@ def cmd_add_user(args):
         sys.exit(1)
 
     allowed_hosts = _parse_hosts(args.hosts) if args.hosts else []
+    password = _read_password(args.password)
     now = _now()
     table.put_item(Item={
         'username': args.username,
-        'password_hash': _hash_password(args.password),
+        'password_hash': _hash_password(password),
         'enabled': True,
         'allowed_hosts': allowed_hosts,
         'created_at': now,
@@ -64,8 +79,15 @@ def cmd_add_user(args):
 
 def cmd_list_users(args):
     table = _table(args)
-    resp = table.scan(ProjectionExpression='username, enabled, allowed_hosts, updated_at')
-    items = sorted(resp.get('Items', []), key=lambda x: x['username'])
+    items = []
+    kwargs = {'ProjectionExpression': 'username, enabled, allowed_hosts, updated_at'}
+    while True:
+        resp = table.scan(**kwargs)
+        items.extend(resp.get('Items', []))
+        if 'LastEvaluatedKey' not in resp:
+            break
+        kwargs['ExclusiveStartKey'] = resp['LastEvaluatedKey']
+    items.sort(key=lambda x: x['username'])
     if not items:
         print('No users found.')
         return
@@ -78,37 +100,68 @@ def cmd_list_users(args):
 
 def cmd_disable_user(args):
     table = _table(args)
-    table.update_item(
-        Key={'username': args.username},
-        UpdateExpression='SET enabled = :v, updated_at = :t',
-        ExpressionAttributeValues={':v': False, ':t': _now()},
-    )
+    try:
+        table.update_item(
+            Key={'username': args.username},
+            UpdateExpression='SET enabled = :v, updated_at = :t',
+            ExpressionAttributeValues={':v': False, ':t': _now()},
+            ConditionExpression='attribute_exists(username)',
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            print(f"ERROR: User '{args.username}' not found.", file=sys.stderr)
+            sys.exit(1)
+        raise
     print(f"Disabled user '{args.username}'.")
 
 
 def cmd_enable_user(args):
     table = _table(args)
-    table.update_item(
-        Key={'username': args.username},
-        UpdateExpression='SET enabled = :v, updated_at = :t',
-        ExpressionAttributeValues={':v': True, ':t': _now()},
-    )
+    try:
+        table.update_item(
+            Key={'username': args.username},
+            UpdateExpression='SET enabled = :v, updated_at = :t',
+            ExpressionAttributeValues={':v': True, ':t': _now()},
+            ConditionExpression='attribute_exists(username)',
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            print(f"ERROR: User '{args.username}' not found.", file=sys.stderr)
+            sys.exit(1)
+        raise
     print(f"Enabled user '{args.username}'.")
 
 
 def cmd_remove_user(args):
     table = _table(args)
-    table.delete_item(Key={'username': args.username})
+    try:
+        table.delete_item(
+            Key={'username': args.username},
+            ConditionExpression='attribute_exists(username)',
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            print(f"ERROR: User '{args.username}' not found.", file=sys.stderr)
+            sys.exit(1)
+        raise
     print(f"Removed user '{args.username}'.")
 
 
 def cmd_update_password(args):
     table = _table(args)
-    table.update_item(
-        Key={'username': args.username},
-        UpdateExpression='SET password_hash = :h, updated_at = :t',
-        ExpressionAttributeValues={':h': _hash_password(args.password), ':t': _now()},
-    )
+    password = _read_password(args.password)
+    try:
+        table.update_item(
+            Key={'username': args.username},
+            UpdateExpression='SET password_hash = :h, updated_at = :t',
+            ExpressionAttributeValues={':h': _hash_password(password), ':t': _now()},
+            ConditionExpression='attribute_exists(username)',
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            print(f"ERROR: User '{args.username}' not found.", file=sys.stderr)
+            sys.exit(1)
+        raise
     print(f"Updated password for '{args.username}'.")
 
 
@@ -121,8 +174,8 @@ def cmd_add_host(args):
 
     hosts = list(item.get('allowed_hosts', []))
     for h in hosts:
-        if h['hostname'] == args.hostname:
-            print(f"Host '{args.hostname}' already in allowed list for '{args.username}'.")
+        if h['hostname'] == args.hostname and h['zone_id'] == args.zone_id:
+            print(f"Host '{args.hostname}' (zone {args.zone_id}) already in allowed list for '{args.username}'.")
             return
 
     hosts.append({'zone_id': args.zone_id, 'hostname': args.hostname})
@@ -141,13 +194,16 @@ def cmd_remove_host(args):
         print(f"ERROR: User '{args.username}' not found.", file=sys.stderr)
         sys.exit(1)
 
-    hosts = [h for h in item.get('allowed_hosts', []) if h['hostname'] != args.hostname]
+    hosts = [
+        h for h in item.get('allowed_hosts', [])
+        if not (h['hostname'] == args.hostname and h['zone_id'] == args.zone_id)
+    ]
     table.update_item(
         Key={'username': args.username},
         UpdateExpression='SET allowed_hosts = :h, updated_at = :t',
         ExpressionAttributeValues={':h': hosts, ':t': _now()},
     )
-    print(f"Removed host '{args.hostname}' from user '{args.username}'.")
+    print(f"Removed host '{args.hostname}' (zone {args.zone_id}) from user '{args.username}'.")
 
 
 def main():
@@ -160,7 +216,7 @@ def main():
 
     p = sub.add_parser('add-user', help='Create a new DDNS user')
     p.add_argument('--username', required=True)
-    p.add_argument('--password', required=True)
+    p.add_argument('--password', default=None, help='Password (prompted if omitted)')
     p.add_argument('--hosts', default='', help='Comma-separated ZONE_ID:hostname pairs')
 
     sub.add_parser('list-users', help='List all DDNS users')
@@ -174,17 +230,18 @@ def main():
     p = sub.add_parser('remove-user', help='Permanently delete a user')
     p.add_argument('--username', required=True)
 
-    p = sub.add_parser('update-password', help='Change a user\'s password')
+    p = sub.add_parser('update-password', help="Change a user's password")
     p.add_argument('--username', required=True)
-    p.add_argument('--password', required=True)
+    p.add_argument('--password', default=None, help='New password (prompted if omitted)')
 
-    p = sub.add_parser('add-host', help='Add a hostname to a user\'s allowed list')
+    p = sub.add_parser('add-host', help="Add a hostname to a user's allowed list")
     p.add_argument('--username', required=True)
     p.add_argument('--zone-id', required=True, dest='zone_id')
     p.add_argument('--hostname', required=True)
 
-    p = sub.add_parser('remove-host', help='Remove a hostname from a user\'s allowed list')
+    p = sub.add_parser('remove-host', help="Remove a hostname from a user's allowed list")
     p.add_argument('--username', required=True)
+    p.add_argument('--zone-id', required=True, dest='zone_id')
     p.add_argument('--hostname', required=True)
 
     args = parser.parse_args()

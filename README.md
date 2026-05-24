@@ -83,9 +83,9 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     ImageUri=771294529343.dkr.ecr.us-east-1.amazonaws.com/ddns-route53:latest \
-    CustomDomainName=ddns.cuppett.com \
+    CustomDomainName=ddns.cuppett.dev \
     CertificateArn=arn:aws:acm:us-east-1:771294529343:certificate/... \
-    HostedZoneIdForDomain=ZYD1DIOLOG0D0 \
+    HostedZoneIdForDomain=Z07412393IK1HEEHEGRPG \
   --profile cuppett
 ```
 
@@ -135,15 +135,15 @@ use=web, web=APIGW_ID.execute-api.us-east-1.amazonaws.com/v1/checkip
 test.cuppett.dev
 ```
 
-With a custom domain (`ddns.cuppett.com`):
+With a custom domain (`ddns.cuppett.dev`):
 
 ```ini
 protocol=dyndns2
-server=ddns.cuppett.com
+server=ddns.cuppett.dev
 ssl=yes
 login=mydevice
 password=a-strong-password
-use=web, web=https://ddns.cuppett.com/checkip, web-skip='Current IP Address: '
+use=web, web=https://ddns.cuppett.dev/checkip, web-skip='Current IP Address: '
 test.cuppett.dev
 ```
 
@@ -155,12 +155,15 @@ Place in `/jffs/scripts/ddns-start`:
 #!/bin/sh
 IP="$1"
 RESULT=$(curl -s -u mydevice:password \
-  "https://ddns.cuppett.com/nic/update?hostname=myhome.cuppett.com&myip=$IP" \
+  "https://ddns.cuppett.dev/nic/update?hostname=myhome.cuppett.dev&myip=$IP" \
   -H "User-Agent: ASUS-Merlin/386 ddns-start")
 /sbin/ddns_custom_updated $(echo "$RESULT" | grep -q "^good\|^nochg" && echo 1 || echo 0)
 ```
 
 ## User Management
+
+All subcommands accept `--profile`, `--region`, and `--table` (default `DDNSAuthorization`).
+`--password` may be omitted from `add-user` and `update-password` to be prompted interactively.
 
 ```bash
 python scripts/manage_users.py --help
@@ -171,16 +174,29 @@ python scripts/manage_users.py list-users --profile cuppett
 # Add a hostname to an existing user
 python scripts/manage_users.py add-host \
   --username mydevice \
-  --zone-id ZYD1DIOLOG0D0 \
-  --hostname home.cuppett.com \
+  --zone-id Z07412393IK1HEEHEGRPG \
+  --hostname home.cuppett.dev \
+  --profile cuppett
+
+# Remove a hostname from a user
+python scripts/manage_users.py remove-host \
+  --username mydevice \
+  --zone-id Z07412393IK1HEEHEGRPG \
+  --hostname home.cuppett.dev \
   --profile cuppett
 
 # Disable a user (immediate effect after authorizer cache TTL)
 python scripts/manage_users.py disable-user --username mydevice --profile cuppett
 
-# Change password
+# Re-enable a disabled user
+python scripts/manage_users.py enable-user --username mydevice --profile cuppett
+
+# Change password (prompts if --password is omitted)
 python scripts/manage_users.py update-password \
   --username mydevice --password 'new-password' --profile cuppett
+
+# Permanently delete a user
+python scripts/manage_users.py remove-user --username mydevice --profile cuppett
 ```
 
 ## Development
