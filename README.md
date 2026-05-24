@@ -2,7 +2,7 @@
 
 DynDNS2-compatible Dynamic DNS service built on AWS Lambda, API Gateway, DynamoDB, and Route53.
 
-Replaces the legacy direct API Gateway→Route53 proxy (`xo1u3hdvy7`) with a fully protocol-compliant implementation supporting all standard DynDNS2 response codes, per-user hostname authorization, and `nochg` detection.
+Replaces a legacy direct API Gateway→Route53 proxy with a fully protocol-compliant implementation supporting all standard DynDNS2 response codes, per-user hostname authorization, and `nochg` detection.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ All responses are HTTP 200 with `Content-Type: text/plain`.
 
 ### Prerequisites
 
-- AWS CLI with `cuppett` profile configured
+- AWS CLI configured (set `PROFILE=<your-profile>` in the Makefile or pass `--profile` to commands)
 - Podman installed
 - Python 3.x and `bcrypt`, `boto3` installed locally for user management
 
@@ -68,10 +68,10 @@ aws cloudformation deploy \
   --stack-name ddns-route53 \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    ImageUri=771294529343.dkr.ecr.us-east-1.amazonaws.com/ddns-route53:latest \
+    ImageUri=123456789012.dkr.ecr.us-east-1.amazonaws.com/ddns-route53:latest \
     RecordTtl=60 \
     StageName=v1 \
-  --profile cuppett
+  --profile <your-profile>
 ```
 
 With optional custom domain:
@@ -82,30 +82,25 @@ aws cloudformation deploy \
   --stack-name ddns-route53 \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    ImageUri=771294529343.dkr.ecr.us-east-1.amazonaws.com/ddns-route53:latest \
-    CustomDomainName=ddns.cuppett.dev \
-    CertificateArn=arn:aws:acm:us-east-1:771294529343:certificate/... \
-    HostedZoneIdForDomain=Z07412393IK1HEEHEGRPG \
-  --profile cuppett
+    ImageUri=123456789012.dkr.ecr.us-east-1.amazonaws.com/ddns-route53:latest \
+    CustomDomainName=ddns.example.com \
+    CertificateArn=arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012 \
+    HostedZoneIdForDomain=Z0123456789ABCDEFGHIJ \
+  --profile <your-profile>
 ```
 
 ### 4. Add users
 
 ```bash
-# Add user allowed to update test.cuppett.dev (use cuppett.dev for testing)
+# Add a user — use a non-production zone for initial testing
 python scripts/manage_users.py add-user \
   --username mydevice \
   --password 'a-strong-password' \
-  --hosts 'Z07412393IK1HEEHEGRPG:test.cuppett.dev' \
-  --profile cuppett
-
-# Add production user (after validation)
-python scripts/manage_users.py add-user \
-  --username google-isp \
-  --password 'a-strong-password' \
-  --hosts 'ZYD1DIOLOG0D0:google.cuppett.com' \
-  --profile cuppett
+  --hosts 'Z0123456789ABCDEFGHIJ:test.example.com' \
+  --profile <your-profile>
 ```
+
+You can pass multiple `ZONE_ID:hostname` pairs to `--hosts` (comma-separated) to allow a user to update more than one record.
 
 ## Client Configuration
 
@@ -115,7 +110,7 @@ python scripts/manage_users.py add-user \
 API=https://APIGW_ID.execute-api.us-east-1.amazonaws.com/v1
 
 # Update a record
-curl -u mydevice:password "$API/nic/update?hostname=test.cuppett.dev&myip=1.2.3.4" \
+curl -u mydevice:password "$API/nic/update?hostname=test.example.com&myip=1.2.3.4" \
   -H "User-Agent: TestClient/1.0 you@example.com"
 
 # Check your public IP
@@ -132,19 +127,19 @@ ssl=yes
 login=mydevice
 password=a-strong-password
 use=web, web=APIGW_ID.execute-api.us-east-1.amazonaws.com/v1/checkip
-test.cuppett.dev
+test.example.com
 ```
 
-With a custom domain (`ddns.cuppett.dev`):
+With a custom domain (`ddns.example.com`):
 
 ```ini
 protocol=dyndns2
-server=ddns.cuppett.dev
+server=ddns.example.com
 ssl=yes
 login=mydevice
 password=a-strong-password
-use=web, web=https://ddns.cuppett.dev/checkip, web-skip='Current IP Address: '
-test.cuppett.dev
+use=web, web=https://ddns.example.com/checkip, web-skip='Current IP Address: '
+test.example.com
 ```
 
 ### ASUS Merlin (custom DDNS script)
@@ -155,7 +150,7 @@ Place in `/jffs/scripts/ddns-start`:
 #!/bin/sh
 IP="$1"
 RESULT=$(curl -s -u mydevice:password \
-  "https://ddns.cuppett.dev/nic/update?hostname=myhome.cuppett.dev&myip=$IP" \
+  "https://ddns.example.com/nic/update?hostname=home.example.com&myip=$IP" \
   -H "User-Agent: ASUS-Merlin/386 ddns-start")
 /sbin/ddns_custom_updated $(echo "$RESULT" | grep -q "^good\|^nochg" && echo 1 || echo 0)
 ```
@@ -169,34 +164,34 @@ All subcommands accept `--profile`, `--region`, and `--table` (default `DDNSAuth
 python scripts/manage_users.py --help
 
 # List all users
-python scripts/manage_users.py list-users --profile cuppett
+python scripts/manage_users.py list-users --profile <your-profile>
 
 # Add a hostname to an existing user
 python scripts/manage_users.py add-host \
   --username mydevice \
-  --zone-id Z07412393IK1HEEHEGRPG \
-  --hostname home.cuppett.dev \
-  --profile cuppett
+  --zone-id Z0123456789ABCDEFGHIJ \
+  --hostname home.example.com \
+  --profile <your-profile>
 
 # Remove a hostname from a user
 python scripts/manage_users.py remove-host \
   --username mydevice \
-  --zone-id Z07412393IK1HEEHEGRPG \
-  --hostname home.cuppett.dev \
-  --profile cuppett
+  --zone-id Z0123456789ABCDEFGHIJ \
+  --hostname home.example.com \
+  --profile <your-profile>
 
 # Disable a user (immediate effect after authorizer cache TTL)
-python scripts/manage_users.py disable-user --username mydevice --profile cuppett
+python scripts/manage_users.py disable-user --username mydevice --profile <your-profile>
 
 # Re-enable a disabled user
-python scripts/manage_users.py enable-user --username mydevice --profile cuppett
+python scripts/manage_users.py enable-user --username mydevice --profile <your-profile>
 
 # Change password (prompts if --password is omitted)
 python scripts/manage_users.py update-password \
-  --username mydevice --password 'new-password' --profile cuppett
+  --username mydevice --password 'new-password' --profile <your-profile>
 
 # Permanently delete a user
-python scripts/manage_users.py remove-user --username mydevice --profile cuppett
+python scripts/manage_users.py remove-user --username mydevice --profile <your-profile>
 ```
 
 ## Development
@@ -216,13 +211,13 @@ Tests use `moto` to mock AWS services — no real AWS calls during unit tests.
 
 ## Migration from Legacy Implementation
 
-The legacy API Gateway (`xo1u3hdvy7`) uses a direct AWS service proxy with a single shared token in SSM (`DDNS_ROUTE53_AUTHORIZATION`). Migration steps:
+If you have a pre-existing DDNS setup (e.g. a direct API Gateway service-proxy or similar), you can migrate to this stack alongside it:
 
 1. Deploy this stack alongside the legacy one (different API Gateway ID)
-2. Test all response codes against the new endpoint using `cuppett.dev` hostnames
+2. Test all response codes against the new endpoint using a non-production hosted zone
 3. Recreate users in DynamoDB matching the current device configuration
 4. Update client configuration to point to the new API Gateway URL
-5. Once all clients are migrated, delete the legacy API Gateway, Lambda (`AuthorizeDDNS`), IAM roles (`API_GW_Route53`, `Read_SSM_Route53_Parameter`), and SSM parameter
+5. Once all clients are migrated, decommission the legacy components (API Gateway, Lambda, IAM roles, any SSM parameters)
 
 ## Design Decisions
 

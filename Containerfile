@@ -12,9 +12,9 @@ LABEL summary="$SUMMARY" \
       version="latest" \
       usage="Container image providing Lambda handlers for the DDNS Route53 service. Set ImageConfig.Command per function." \
       maintainer="Stephen Cuppett steve@cuppett.com" \
-      org.opencontainers.image.source="https://github.com/cuppett/ddns-route53" \
-      org.opencontainers.image.url="ghcr.io/cuppett/ddns-route53" \
-      org.opencontainers.image.documentation="https://github.com/cuppett/ddns-route53/blob/main/README.md"
+      org.opencontainers.image.source="https://github.com/cuppett/aws-route53-ddns" \
+      org.opencontainers.image.url="ghcr.io/cuppett/aws-route53-ddns" \
+      org.opencontainers.image.documentation="https://github.com/cuppett/aws-route53-ddns/blob/main/README.md"
 
 COPY src/requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt

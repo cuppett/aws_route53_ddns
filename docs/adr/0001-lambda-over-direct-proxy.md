@@ -12,7 +12,7 @@ The legacy implementation uses an API Gateway AWS service proxy integration that
 - Produce any of the DynDNS2 error response codes (`badauth`, `notfqdn`, `nohost`, etc.)
 - Enforce per-user hostname authorization beyond the IAM level
 
-Discovered state: API Gateway ID `xo1u3hdvy7`, created 2020-01-04, integration URI `arn:aws:apigateway:us-east-1:route53:path/2013-04-01/hostedzone/{hosted_zone_id}/rrset/`.
+The pre-existing implementation used a direct API Gateway service-proxy integration with URI `arn:aws:apigateway:<region>:route53:path/2013-04-01/hostedzone/{hosted_zone_id}/rrset/`.
 
 ## Decision
 

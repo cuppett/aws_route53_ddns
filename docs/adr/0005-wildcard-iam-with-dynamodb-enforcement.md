@@ -5,7 +5,7 @@
 
 ## Context
 
-The legacy IAM policy (`Route53_Update_Cuppett_COM`) explicitly names the cuppett.com zone ARN. To add new zones, the IAM policy must be updated.
+The legacy IAM policy explicitly named a specific hosted zone ARN. Adding a new zone required updating the IAM policy.
 
 Options for the new implementation:
 1. List all zone ARNs as CloudFormation parameters, construct explicit IAM policy

@@ -1,6 +1,6 @@
-ACCOUNT_ID ?= 771294529343
+ACCOUNT_ID ?= 123456789012
 REGION     ?= us-east-1
-PROFILE    ?= cuppett
+PROFILE    ?= default
 REPO_NAME  ?= ddns-route53
 IMAGE_TAG  ?= latest
 
@@ -29,7 +29,7 @@ help:
 	@echo "  IMAGE_TAG   $(IMAGE_TAG)"
 
 install:
-	pip install -r tests/requirements.txt
+	python3 -m pip install -r tests/requirements.txt
 
 test:
 	python -m pytest tests/ -v

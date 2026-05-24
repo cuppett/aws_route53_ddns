@@ -48,7 +48,7 @@ def ddb_table():
             'password_hash': _make_hash('testpass'),
             'enabled': True,
             'allowed_hosts': [
-                {'zone_id': 'Z07412393IK1HEEHEGRPG', 'hostname': 'test.cuppett.dev'},
+                {'zone_id': 'Z0123456789ABCDEFGHIJ', 'hostname': 'test.example.com'},
             ],
         })
         yield table
@@ -64,8 +64,8 @@ def test_context_contains_allowed_hosts(ddb_table):
     resp = handler(_event(), None)
     hosts = json.loads(resp['context']['allowed_hosts'])
     assert len(hosts) == 1
-    assert hosts[0]['hostname'] == 'test.cuppett.dev'
-    assert hosts[0]['zone_id'] == 'Z07412393IK1HEEHEGRPG'
+    assert hosts[0]['hostname'] == 'test.example.com'
+    assert hosts[0]['zone_id'] == 'Z0123456789ABCDEFGHIJ'
 
 
 def test_wrong_password_returns_deny(ddb_table):

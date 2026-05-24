@@ -45,7 +45,7 @@ Parameters:
     Default: v1
 
   CustomDomainName:
-    Description: "(Optional) Custom domain name for the API (e.g. ddns.cuppett.com). Leave blank to use the default execute-api URL."
+    Description: "(Optional) Custom domain name for the API (e.g. ddns.example.com). Leave blank to use the default execute-api URL."
     Type: String
     Default: ""
 

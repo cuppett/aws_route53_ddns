@@ -13,8 +13,8 @@ os.environ['AWS_SECRET_ACCESS_KEY'] = 'test'
 
 from src.update_handler import handler  # noqa: E402
 
-ZONE_ID = 'Z07412393IK1HEEHEGRPG'
-HOSTNAME = 'test.cuppett.dev'
+ZONE_ID = 'Z0123456789ABCDEFGHIJ'
+HOSTNAME = 'test.example.com'
 ALLOWED_HOSTS = json.dumps([{'zone_id': ZONE_ID, 'hostname': HOSTNAME}])
 
 
@@ -38,7 +38,7 @@ def r53_zone():
     with mock_aws():
         r53 = boto3.client('route53', region_name='us-east-1')
         r53.create_hosted_zone(
-            Name='cuppett.dev.',
+            Name='example.com.',
             CallerReference='unique-ref-1',
         )
         # Swap to the moto-assigned zone ID — moto returns a fixed ID format
@@ -96,7 +96,7 @@ def test_numhost_too_many(r53_zone):
 
 def test_nohost_not_in_allowed_list(r53_zone):
     r53, zone_id, allowed = r53_zone
-    resp = handler(_event(hostname='notallowed.cuppett.dev', allowed_hosts=allowed), None)
+    resp = handler(_event(hostname='notallowed.example.com', allowed_hosts=allowed), None)
     assert resp['body'] == 'nohost'
 
 
@@ -110,7 +110,7 @@ def test_myip_defaults_to_source_ip(r53_zone):
 
 def test_multiple_hostnames(r53_zone):
     r53, zone_id, allowed_single = r53_zone
-    host2 = 'ddns-test.cuppett.dev'
+    host2 = 'ddns-test.example.com'
     allowed = json.dumps([
         {'zone_id': zone_id, 'hostname': HOSTNAME},
         {'zone_id': zone_id, 'hostname': host2},
@@ -124,7 +124,7 @@ def test_multiple_hostnames(r53_zone):
 
 def test_multiple_hostnames_mixed_results(r53_zone):
     r53, zone_id, allowed_single = r53_zone
-    host2 = 'ddns-test.cuppett.dev'
+    host2 = 'ddns-test.example.com'
     allowed = json.dumps([
         {'zone_id': zone_id, 'hostname': HOSTNAME},
         {'zone_id': zone_id, 'hostname': host2},
